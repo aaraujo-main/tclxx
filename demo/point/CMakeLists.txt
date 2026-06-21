@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.16)
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(tclxx_point_demo LANGUAGES CXX)
+endif()
+
+find_package(TCL QUIET)
+
+if(NOT TCL_LIBRARY OR NOT TCL_INCLUDE_PATH)
+    find_path(TCLXX_TCL_INCLUDE_DIR tcl.h REQUIRED)
+    find_library(TCLXX_TCL_LIBRARY NAMES tcl tcl8.7 tcl8.6 REQUIRED)
+endif()
+
+add_executable(point_demo main.cpp)
+target_compile_features(point_demo PRIVATE cxx_std_17)
+
+if(TARGET tclxx::tclxx)
+    target_link_libraries(point_demo PRIVATE tclxx::tclxx)
+else()
+    target_include_directories(point_demo PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../include)
+endif()
+
+if(TARGET Tcl::Tcl)
+    target_link_libraries(point_demo PRIVATE Tcl::Tcl)
+elseif(TARGET TCL::TCL)
+    target_link_libraries(point_demo PRIVATE TCL::TCL)
+else()
+    if(TCL_INCLUDE_PATH AND TCL_LIBRARY)
+        target_include_directories(point_demo PRIVATE ${TCL_INCLUDE_PATH})
+        target_link_libraries(point_demo PRIVATE ${TCL_LIBRARY})
+    else()
+        target_include_directories(point_demo PRIVATE ${TCLXX_TCL_INCLUDE_DIR})
+        target_link_libraries(point_demo PRIVATE ${TCLXX_TCL_LIBRARY})
+    endif()
+endif()
