@@ -210,4 +210,152 @@ TEST_F(TclInterpFixture, SharedPtrNullPointeeConvertsToNullRawPointer) {
     Tcl_DecrRefCount(obj);
 }
 
+TEST_F(TclInterpFixture, StdFunctionCastConvertsLambdaAndExecutes) {
+    const char* lambdaScript = "{a b} {expr {$a + $b}}";
+    Tcl_Obj* lambdaObj = Tcl_NewStringObj(lambdaScript, -1);
+
+    Tcl_IncrRefCount(lambdaObj);
+
+    // Convert to std::function<int(int, int)>
+    auto addFunc = tclxx::obj_cast::to<std::function<int(int, int)>>(interp_, lambdaObj);
+
+    // Execute function with arguments
+    int result = addFunc(10, 20);
+    EXPECT_EQ(result, 30);
+
+    // Verify with different arguments
+    EXPECT_EQ(addFunc(5, 7), 12);
+    EXPECT_EQ(addFunc(-3, 8), 5);
+
+    Tcl_DecrRefCount(lambdaObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastWithDoubleReturnType) {
+    const char* lambdaScript = "{x y} {expr {$x * $y * 0.5}}";
+    Tcl_Obj* lambdaObj = Tcl_NewStringObj(lambdaScript, -1);
+    Tcl_IncrRefCount(lambdaObj);
+
+    // Convert to std::function<double(double, double)>
+    auto multiplyFunc = tclxx::obj_cast::to<std::function<double(double, double)>>(interp_, lambdaObj);
+
+    // Execute and verify
+    double result = multiplyFunc(4.0, 5.0);
+    EXPECT_NEAR(result, 10.0, 1e-9);
+
+    EXPECT_NEAR(multiplyFunc(2.5, 3.0), 3.75, 1e-9);
+
+    Tcl_DecrRefCount(lambdaObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastWithStringArguments) {
+    const char* lambdaScript = "{s1 s2} {format \"%s-%s\" $s1 $s2}";
+    Tcl_Obj* lambdaObj = Tcl_NewStringObj(lambdaScript, -1);
+    Tcl_IncrRefCount(lambdaObj);
+
+    // Convert to std::function<std::string(std::string, std::string)>
+    auto concatFunc = tclxx::obj_cast::to<std::function<std::string(std::string, std::string)>>(interp_, lambdaObj);
+
+    // Execute and verify
+    std::string result = concatFunc("hello", "world");
+    EXPECT_EQ(result, "hello-world");
+
+    EXPECT_EQ(concatFunc("foo", "bar"), "foo-bar");
+
+    Tcl_DecrRefCount(lambdaObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastWithVoidReturnType) {
+    const char* lambdaScript = "{x} {set ::global_test_var $x}";
+    Tcl_Obj* lambdaObj = Tcl_NewStringObj(lambdaScript, -1);
+    Tcl_IncrRefCount(lambdaObj);
+
+    // Convert to std::function<void(int)>
+    auto voidFunc = tclxx::obj_cast::to<std::function<void(int)>>(interp_, lambdaObj);
+
+    // Execute function
+    voidFunc(42);
+
+    // Verify side effect in Tcl interpreter
+    Tcl_Obj* varObj = Tcl_GetVar2Ex(interp_, "::global_test_var", nullptr, TCL_GLOBAL_ONLY);
+    ASSERT_NE(varObj, nullptr);
+    int varValue = 0;
+    EXPECT_EQ(Tcl_GetIntFromObj(interp_, varObj, &varValue), TCL_OK);
+    EXPECT_EQ(varValue, 42);
+
+    Tcl_DecrRefCount(lambdaObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastInvalidLambdaThrows) {
+    // more than 3 elements throws error:
+    // - 1 element: is a proc name, valid
+    // - 2 elements: is a lambda with args and body, valid
+    // - 3 elements: is a lambda with args, body, and namespace, valid
+    const char* invalidScript = "one two three four";
+    Tcl_Obj* invalidObj = Tcl_NewStringObj(invalidScript, -1);
+    Tcl_IncrRefCount(invalidObj);
+
+    try {
+        (void)tclxx::obj_cast::to<std::function<int()>>(interp_, invalidObj);
+        FAIL() << "Expected invalid lambda format to throw";
+    } catch (const std::exception& e) {
+        EXPECT_NE(std::string(e.what()).find("Invalid Tcl callback"), std::string::npos);
+    }
+
+    Tcl_DecrRefCount(invalidObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastConvertsProcNameAndExecutes) {
+    ASSERT_EQ(Tcl_EvalEx(interp_, "proc add_pair {a b} {expr {$a + $b}}", -1, TCL_EVAL_GLOBAL), TCL_OK)
+        << ResultString(interp_);
+
+    Tcl_Obj* procNameObj = Tcl_NewStringObj("add_pair", -1);
+    Tcl_IncrRefCount(procNameObj);
+
+    auto addPairFunc = tclxx::obj_cast::to<std::function<int(int, int)>>(interp_, procNameObj);
+
+    EXPECT_EQ(addPairFunc(4, 6), 10);
+    EXPECT_EQ(addPairFunc(-3, 8), 5);
+
+    Tcl_DecrRefCount(procNameObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastConvertsNamespacedProcNameAndExecutes) {
+    ASSERT_EQ(Tcl_EvalEx(interp_, "namespace eval ::math_helpers {proc scale {value factor} {expr {$value * $factor}}}", -1, TCL_EVAL_GLOBAL), TCL_OK)
+        << ResultString(interp_);
+
+    Tcl_Obj* procNameObj = Tcl_NewStringObj("::math_helpers::scale", -1);
+    Tcl_IncrRefCount(procNameObj);
+
+    auto scaleFunc = tclxx::obj_cast::to<std::function<double(double, double)>>(interp_, procNameObj);
+
+    EXPECT_NEAR(scaleFunc(2.5, 4.0), 10.0, 1e-9);
+    EXPECT_NEAR(scaleFunc(1.5, 3.0), 4.5, 1e-9);
+
+    Tcl_DecrRefCount(procNameObj);
+}
+
+TEST_F(TclInterpFixture, StdFunctionCastMultipleInvocations) {
+    const char* lambdaScript = "{inc} {incr ::counter $inc}";
+    Tcl_Obj* lambdaObj = Tcl_NewStringObj(lambdaScript, -1);
+    Tcl_IncrRefCount(lambdaObj);
+
+    // Initialize counter in Tcl
+    Tcl_SetVar2Ex(interp_, "::counter", nullptr, Tcl_NewIntObj(0), TCL_GLOBAL_ONLY);
+
+    // Convert to std::function<int(int)>
+    auto incrFunc = tclxx::obj_cast::to<std::function<int(int)>>(interp_, lambdaObj);
+
+    // Multiple invocations
+    int result1 = incrFunc(5);
+    EXPECT_EQ(result1, 5);
+
+    int result2 = incrFunc(3);
+    EXPECT_EQ(result2, 8);
+
+    int result3 = incrFunc(2);
+    EXPECT_EQ(result3, 10);
+
+    Tcl_DecrRefCount(lambdaObj);
+}
+
 } // namespace
