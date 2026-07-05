@@ -252,8 +252,8 @@ namespace tclxx { namespace obj_cast {
             }();
 
             // Bind exact structural types from traits to maximize compiler unrolling optimizations
-            return [isLambda, s_applyToken](Tcl_Interp* interp, std::shared_ptr<Tcl_Obj> lambdaPtr, args_tuple) {
-                return FuncType([interp, lambdaPtr, isLambda, s_applyToken](auto&&... args) -> R {
+            return [isLambda](Tcl_Interp* interp, std::shared_ptr<Tcl_Obj> lambdaPtr, args_tuple) {
+                return FuncType([interp, lambdaPtr, isLambda](auto&&... args) -> R {
                     constexpr std::size_t num_args = sizeof...(args);
                     size_t cmdOffset = isLambda ? 2 : 1;
                     size_t totalObjc = cmdOffset + num_args;
