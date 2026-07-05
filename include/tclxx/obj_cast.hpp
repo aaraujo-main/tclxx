@@ -258,7 +258,7 @@ namespace tclxx { namespace obj_cast {
                     size_t cmdOffset = isLambda ? 2 : 1;
                     size_t totalObjc = cmdOffset + num_args;
 
-                    // MAXIMIZATION: Zero heap allocations. Arguments live on the execution stack.
+                    // Zero heap allocations. Arguments live on the execution stack.
                     Tcl_Obj* evalObjvStack[2 + num_args]; 
 
                     if (isLambda) {
