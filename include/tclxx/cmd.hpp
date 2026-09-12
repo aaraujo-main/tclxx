@@ -186,6 +186,9 @@ namespace detail {
                 return obj_cast::from_shared<tclxx::detail::ownership::owned>(shared);
             }
         } else if constexpr (std::is_pointer_v<decayed_t> &&
+                             std::is_same_v<std::remove_cv_t<std::remove_pointer_t<decayed_t>>, Tcl_Obj>) {
+            return const_cast<Tcl_Obj*>(result);
+        } else if constexpr (std::is_pointer_v<decayed_t> &&
                              !std::is_same_v<std::remove_cv_t<std::remove_pointer_t<decayed_t>>, Tcl_Obj>) {
             if constexpr (PointerMode == pointer_return_mode::owned) {
                 return obj_cast::from_owned(result);

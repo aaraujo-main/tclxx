@@ -158,8 +158,16 @@ double point_get_x(ApiPoint* point) {
     return point->getX();
 }
 
+Tcl_Obj* point_get_obj(ApiPoint*) {
+    return Tcl_NewIntObj(42);
+}
+
 void point_set_x(ApiPoint* point, double value) {
     point->setX(value);
+}
+
+std::string object_arg_text(Tcl_Obj* object) {
+    return Tcl_GetString(object);
 }
 
 ApiPoint* point_clone_owned(ApiPoint* point) {
@@ -207,6 +215,7 @@ protected:
         TCLXX_CMD_GETTER_METHOD(interp_, "::ApiPoint::get.x", &ApiPoint::getX);
         TCLXX_CMD_GETTER_METHOD(interp_, "::ApiPoint::get.name", &ApiPoint::getName);
         TCLXX_CMD_GETTER(interp_, "::ApiPoint::get.x.free", &point_get_x);
+        TCLXX_CMD_GETTER(interp_, "::ApiPoint::get.obj", &point_get_obj);
         TCLXX_CMD_GETTER_METHOD(interp_, "::ArgCapture::get.desc", &ArgCapture::describe);
         TCLXX_CMD_SETTER_METHOD(interp_, "::ArgCapture::set.label", &ArgCapture::setLabel);
         TCLXX_CMD_GETTER_OWNED(interp_, "::ApiPoint::clone.free.owned", &point_clone_owned);
@@ -236,6 +245,7 @@ protected:
         TCLXX_CMD_STATIC(interp_, "::ApiPoint::origin.null.weak", &ApiPoint::originNullWeak);
         TCLXX_CMD_STATIC_OWNED(interp_, "::ApiPoint::origin.null.owned", &ApiPoint::originNullOwned);
         TCLXX_CMD_STATIC(interp_, "::ApiPoint::hypot", &ApiPoint::hypot);
+        TCLXX_CMD_STATIC(interp_, "::ApiPoint::object.arg", &object_arg_text);
         TCLXX_CMD_STATIC(interp_, "::ApiPoint::class", &ApiPoint::className);
         TCLXX_CMD_STATIC(interp_, "::ApiPoint::noop", &ApiPoint::noop);
     }
@@ -295,6 +305,21 @@ TEST_F(CmdWrapperFixture, ConstructorGetterAndSetterCommandsWork) {
     ASSERT_TRUE(EvalOk(interp_, "::ApiPoint::set.x.free p 12.25"));
     ASSERT_TRUE(EvalOk(interp_, "expr {[::ApiPoint::get.x $p] == 12.25}"));
     EXPECT_EQ(ResultString(interp_), "1");
+}
+
+TEST_F(CmdWrapperFixture, GetterPreservesRawTclObjectResult) {
+    ASSERT_TRUE(EvalOk(interp_, "set p [::ApiPoint::new()]"));
+    ASSERT_TRUE(EvalOk(interp_, "::ApiPoint::get.obj $p"));
+
+    EXPECT_EQ(ResultString(interp_), "42");
+    int value = 0;
+    ASSERT_EQ(Tcl_GetIntFromObj(interp_, Tcl_GetObjResult(interp_), &value), TCL_OK);
+    EXPECT_EQ(value, 42);
+}
+
+TEST_F(CmdWrapperFixture, CommandConvertsTclObjectParameter) {
+    ASSERT_TRUE(EvalOk(interp_, "::ApiPoint::object.arg {typed Tcl object}"));
+    EXPECT_EQ(ResultString(interp_), "typed Tcl object");
 }
 
 TEST_F(CmdWrapperFixture, CreateArgsCommandsForwardRawInvocationTuple) {
