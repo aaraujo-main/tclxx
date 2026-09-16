@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(tclxx VERSION 0.1.0 LANGUAGES CXX)
+project(tclxx VERSION 0.1.2 LANGUAGES CXX)
 
 option(TCLXX_BUILD_DEMOS "Build demo applications" ON)
 option(TCLXX_BUILD_TESTS "Build GoogleTest-based test suites" ON)
